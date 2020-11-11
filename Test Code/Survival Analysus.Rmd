@@ -1,0 +1,80 @@
+---
+title: "Final Project"
+author: "Olivia Hetland"
+date: "11/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+#Libraries all taken from Tutorial 5
+library("TCGAbiolinks")
+library("survival")
+library("survminer")
+
+library("ggplot2")
+library("ggpubr")
+
+library("SummarizedExperiment")
+library("GenomicRanges")
+library("stats4")
+library("BiocGenerics")
+library("parallel")
+
+#Needed to read an excel file
+library("readxl")
+
+#Used to rename a column in the dataframe
+library("plyr")
+
+#Open the file
+data <- read_excel("C:\\Users\\olivi\\Downloads\\BMEG 310-Git\\310 Project\\BMEG310-Project\\AgeData.xlsx")
+
+#Make as a dataframe
+data_df = data[c("Age","Status","Time","Follow up")]
+
+#I used this to extract the "1" and "0" from the Survivial column, but I'm not sure if we need to do this. I took this from my Assignment 2
+for (i in 1:512) {
+  
+  string <- as.character(data_df[i,2])
+  
+  split <- strsplit(string, ":")
+  
+  if(split[[1]] == "1"){
+    status <- grepl("1", split[[1]])
+    
+  } else {
+    status <- grepl("0", split[[1]])
+  
+  }
+  #New column in the dataframe containing 1's and 0's instead of "1:DECEASED" and "0:LIVING"
+  data_df[i,5] <- split[[1]][status]
+}
+
+#Rename the Column
+names(data_df)[5] <- "Survival"
+
+head(data_df)
+
+#The Patient is dead if Survival is 1
+data_df$deceased = data_df$Survival  == "1"
+data_df$overall_survival = ifelse(data_df$deceased,
+                                  data_df$Time, 
+                                  data_df$`Follow up`)
+
+Surv(data_df$overall_survival, data_df$deceased)
+Surv(data_df$overall_survival, data_df$deceased) ~ data_df$Age
+
+fit = survfit(Surv(overall_survival, deceased) ~ Age, data=data_df)
+print(fit)
+
+ggsurvplot(fit, data=data_df)
+
+
+
+```
+
