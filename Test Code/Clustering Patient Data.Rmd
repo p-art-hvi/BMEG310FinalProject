@@ -1,0 +1,121 @@
+---
+title: "BMEG 310 Project - Clustering"
+author: "Amarpreet Powar"
+date: "03/11/2020"
+output: html_document
+---
+
+# Comparing features against disease-specific survival status
+```{r Extract Data}
+# Extract data
+
+library("readxl")
+library("klaR")
+
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")
+head(patient_dataset)
+
+# NOTE AGE WAS REMOVED SINCE IT'S QUANTITATIVE DATA
+features_1 = c("SEX", "AJCC_PATHOLOGIC_TUMOR_STAGE", "HISTORY_NEOADJUVANT_TRTYN", "NEW_TUMOR_EVENT_AFTER_INITIAL_TREATMENT", "PATH_M_STAGE", "PATH_N_STAGE", "PATH_T_STAGE", "PRIMARY_LYMPH_NODE_PRESENTATION_ASSESSMENT","PRIOR_DX", "RACE","DSS_STATUS")
+
+patient_data_1 <- patient_dataset[ , features_1]
+# Remove patients with missing data
+patient_data_subset_1 <- patient_data_1[complete.cases(patient_data_1), ]
+
+set.seed(123)
+km_patient_data_1 <- kmodes(patient_data_subset_1[ , 1:(ncol(patient_data_subset_1)-1)], 2)
+
+# compare against disease-specific Survival status
+disease_survival <- patient_data_subset_1$DSS_STATUS
+
+confusion_matrix <- table(km_patient_data_1$cluster, disease_survival)
+confusion_matrix
+
+
+```
+# Comparing features against tumour status
+```{r Extract Data}
+# Extract data
+
+library("readxl")
+library("klaR")
+
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")
+head(patient_dataset)
+
+# NOTE AGE WAS REMOVED SINCE IT'S QUANTITATIVE DATA
+features_1 = c("SEX", "AJCC_PATHOLOGIC_TUMOR_STAGE", "HISTORY_NEOADJUVANT_TRTYN", "NEW_TUMOR_EVENT_AFTER_INITIAL_TREATMENT", "PATH_M_STAGE", "PATH_N_STAGE", "PATH_T_STAGE", "PRIMARY_LYMPH_NODE_PRESENTATION_ASSESSMENT","PRIOR_DX", "RACE", "PERSON_NEOPLASM_CANCER_STATUS", "DSS_STATUS")
+
+patient_data_1 <- patient_dataset[ , features_1]
+# Remove patients with missing data
+patient_data_subset_1 <- patient_data_1[complete.cases(patient_data_1), ]
+
+set.seed(123)
+km_patient_data_1 <- kmodes(patient_data_subset_1[ , c("SEX","HISTORY_NEOADJUVANT_TRTYN", "NEW_TUMOR_EVENT_AFTER_INITIAL_TREATMENT", "PATH_M_STAGE", "PATH_N_STAGE", "PATH_T_STAGE", "PRIMARY_LYMPH_NODE_PRESENTATION_ASSESSMENT","PRIOR_DX", "RACE")], 2)
+
+# compare against tumour status
+tumour_status <- patient_data_subset_1$PERSON_NEOPLASM_CANCER_STATUS
+
+confusion_matrix <- table(km_patient_data_1$cluster, tumour_status)
+confusion_matrix
+
+
+```
+
+# Looking at T, N, M data vs stage of cancer
+```{r Extract Data}
+# Extract data
+
+library("readxl")
+library("klaR")
+
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")
+head(patient_dataset)
+
+features_1 = c("PATH_M_STAGE", "PATH_N_STAGE", "PATH_T_STAGE", "AJCC_PATHOLOGIC_TUMOR_STAGE")
+
+patient_data_1 <- patient_dataset[ , features_1]
+head(patient_data_1)
+
+# Remove patients with missing data
+patient_data_1 <- patient_data_1[complete.cases(patient_data_1), ]
+
+set.seed(123)
+km_patient_data_1 <- kmodes(patient_data_1, 4)
+
+# compare cancer codes to stage
+confusion_matrix <- table(km_patient_data_1$cluster, patient_data_1$AJCC_PATHOLOGIC_TUMOR_STAGE)
+confusion_matrix
+
+
+```
+
+# Looking at M, N, T data and disease status
+```{r Extract Data}
+# Extract data
+
+library("readxl")
+library("klaR")
+
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")
+head(patient_dataset)
+
+features_1 = c("PATH_M_STAGE", "PATH_N_STAGE", "PATH_T_STAGE", "DSS_STATUS")
+
+patient_data_1 <- patient_dataset[ , features_1]
+
+# Remove patients with missing data
+patient_data_1 <- patient_data_1[complete.cases(patient_data_1), ]
+
+set.seed(123)
+km_patient_data_1 <- kmodes(patient_data_1[, 1:3], 2)
+
+# compare cancer codes to disease
+confusion_matrix <- table(km_patient_data_1$cluster, patient_data_1$DSS_STATUS)
+confusion_matrix
+# More people in cluster 1 died with tumour?
+# 28% vs 13%
+
+```
+
+
