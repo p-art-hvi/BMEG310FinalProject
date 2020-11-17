@@ -1,0 +1,238 @@
+---
+title: "RNA_Seq_Results_v1"
+author: "Amarpreet Powar"
+date: "16/11/2020"
+output: html_document
+---
+
+# Importing Data  
+
+```{r import data}
+
+gene_exp <- read.csv("RNAseq.csv", header = TRUE)
+# Extract patient IDs from RNAseq file
+gene_patient_IDs <- colnames(gene_exp)[-1]
+# Replace the "." in the names with "-" to match the format given in the clinical data 
+gene_patient_IDs = gsub(".", "-", gene_patient_IDs, fixed = TRUE)
+```
+
+# Matching the patient IDs from the clinical data to the RNAseq data  
+
+```{r matching clinical patient data}
+
+library("readxl")
+library("klaR")
+library("stringr")
+
+# Extract patient IDs from clinical data
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")
+patient_IDs <- patient_dataset$PATIENT_ID
+
+temp <- vector()
+ind <- vector()
+# This vector will store the row numbers that correspond to patients from the clinical data that we have RNAseq data for
+clinical_ind <- integer(nrow(patient_dataset))  # Initialize a vector of zeros
+
+# Go through each patient ID from the clinical dataset and see if there is a match in the RNAseq dataset
+for (i in 1:nrow(patient_dataset)) {
+  temp <- grep(patient_IDs[i], gene_patient_IDs) # Note that the patient IDs in the RNAseq dataset contain extra characters at the end, so we have to make sure the beginning part of the sequence corresponds to the clinical patient IDs
+  if (length(temp) == 1)  {      # Patients who only have 1 column of data in the RNAseq dataset
+    ind = append(ind, temp)   # Store the index of RNAseq patient ID we have a match for
+    clinical_ind[i] = 1;    # Make note of which patients from the clinical data have a match
+  }
+}
+
+# Ind contains the indices in gene_patient_IDs which correspond to patients in the clinical data spreadsheet
+edited_gene_data <- gene_exp[ , ind+1] # Remember first column in gene_exp refers to the gene name
+colnames(edited_gene_data) <- str_sub(gene_patient_IDs[ind], end=-17)  # Edit the column names to match the clinical data ID
+edited_gene_data <- t(edited_gene_data) # Transposing gene expression data so that samples are rows instead of columns
+edited_gene_data <- edited_gene_data[ , which(apply(edited_gene_data, 2, var) != 0)] #remove genes where all samples have same expression
+subset_clinical_data <- patient_dataset[which(clinical_ind == 1), ] # Patients from clinical dataset we have RNAseq data for
+
+```
+
+# K-means analysis (without PCA results)
+```{r k-means clustering without PCA}
+
+set.seed(123)
+
+# Scale data and run k-means
+scaled_exp_data <- scale(edited_gene_data)
+km_exp_data <- kmeans(scaled_exp_data, 2, nstart = 25)
+
+# Plot the clusters
+library(factoextra)
+fviz_cluster(km_exp_data, data = scaled_exp_data, geom = (c("point")))
+
+# Confusion matrx for DSS survival
+confusion_matrix <- table(km_exp_data$cluster, subset_clinical_data$DSS_STATUS)
+print(confusion_matrix)
+print(paste("Cluster 1: ",58/(58+238)," dead with tumour"))
+print(paste("Cluster 2: ",31/(31+99)," dead with tumour"))
+
+# Confusion matrx for OS survival
+confusion_matrix <- table(km_exp_data$cluster, subset_clinical_data$OS_STATUS)
+print(confusion_matrix)
+print(paste("Cluster 1: ",87/(87+212)," deceased"))
+print(paste("Cluster 2: ",54/(54+80)," dead with tumour"))
+
+
+# Confusion matrx for person neoplasm cancer status
+confusion_matrix <- table(km_exp_data$cluster, subset_clinical_data$PERSON_NEOPLASM_CANCER_STATUS)
+print(confusion_matrix)
+print(paste("Cluster 1: ",77/(77+208)," with tumour"))
+print(paste("Cluster 2: ",38/(38+93)," with tumour"))
+
+# Confusion matrx for sex
+confusion_matrix <- table(km_exp_data$cluster, subset_clinical_data$SEX)
+print(confusion_matrix)
+print(paste("Cluster 1: ",188/(188+111)," male"))
+print(paste("Cluster 1: ",81/(81+53)," male"))
+```
+
+# PCA  
+
+```{r PCA}
+
+# Run PCA
+gene_exp_pca <- prcomp(edited_gene_data, center = TRUE, scale. = TRUE)
+summary(gene_exp_pca)
+
+score <- gene_exp_pca$x
+score <- as.data.frame(score)
+
+boxplot(score, main = "Distribution of the PCs")    # Plotting boxplot of PCs for visualization
+
+library(ggbiplot)
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data$DSS_STATUS))) + geom_point(size = 4) 
+pc_plot
+
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data$OS_STATUS))) + geom_point(size = 4) 
+pc_plot
+
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data$PERSON_NEOPLASM_CANCER_STATUS))) + geom_point(size = 4) 
+pc_plot
+
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data$SEX))) + geom_point(size = 4) 
+pc_plot
+
+```
+
+### Note that after PC11, the PCs represent less than 1% of the variation in the data  
+
+# K-means analysis on PCs
+
+```{r kmeans pca}
+
+  set.seed(123)
+
+  # Use PCs 1-11
+  km_pc <- kmeans(score[, 1:11], 2, nstart = 25)
+  
+  # Plot the clusters
+  library(factoextra)
+  fviz_cluster(km_pc, data = score[, 1:11], ellipse = FALSE, geom = (c("point")))
+  
+  # Confusion matrx for DSS survival
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data$DSS_STATUS)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",58/(58+238)," dead with tumour"))
+  print(paste("Cluster 2: ",31/(31+99)," dead with tumour"))
+  
+  # Confusion matrx for OS survival
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data$OS_STATUS)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",87/(87+212)," deceased"))
+  print(paste("Cluster 2: ",54/(54+80)," dead with tumour"))
+
+
+  # Confusion matrx for person neoplasm cancer status
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data$PERSON_NEOPLASM_CANCER_STATUS)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",77/(77+208)," with tumour"))
+  print(paste("Cluster 2: ",38/(38+93)," with tumour"))
+  
+  # Confusion matrx for sex
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data$SEX)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",188/(188+111)," male"))
+  print(paste("Cluster 1: ",81/(81+53)," male"))
+
+```
+
+### Exact same results from when k-means clustering was done without PCA data  
+
+# Note: From the plot of PC1 vs PC2, there is one obvious outlier, so now let's repeat the analysis without this outlier and see if this changes anything  
+
+# PCA without outlier
+
+```{r PCA no outlier}
+
+# Remove outlier
+edited_gene_data <- edited_gene_data[-357, ]
+edited_gene_data <- edited_gene_data[ , which(apply(edited_gene_data, 2, var) != 0)] #remove genes where all samples have same expression
+
+# Run PCA
+gene_exp_pca <- prcomp(edited_gene_data, center = TRUE, scale. = TRUE)
+summary(gene_exp_pca)
+
+score <- gene_exp_pca$x
+score <- as.data.frame(score)
+
+boxplot(score, main = "Distribution of the PCs")    # Plotting boxplot of PCs for visualization
+
+library(ggbiplot)
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data[-357, ]$DSS_STATUS))) + geom_point(size = 4) 
+pc_plot
+
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data[-357, ]$OS_STATUS))) + geom_point(size = 4) 
+pc_plot
+
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data[-357, ]$PERSON_NEOPLASM_CANCER_STATUS))) + geom_point(size = 4) 
+pc_plot
+
+pc_plot <- ggplot(score, aes(x=PC1, y=PC2, color=as.factor(subset_clinical_data[-357, ]$SEX))) + geom_point(size = 4) 
+pc_plot
+
+```
+
+# K-means on PCA without outlier  
+
+```{r kmeans pca no outlier}
+
+  set.seed(123)
+
+  # Use PCs 1-11
+  km_pc <- kmeans(score[, 1:11], 2, nstart = 25)
+  
+  # Plot the clusters
+  library(factoextra)
+  fviz_cluster(km_pc, data = score[, 1:11], ellipse = FALSE, geom = (c("point")))
+  
+  # Confusion matrx for DSS survival
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data[-357, ]$DSS_STATUS)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",58/(58+237)," dead with tumour"))
+  print(paste("Cluster 2: ",31/(31+99)," dead with tumour"))
+  
+  # Confusion matrx for OS survival
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data[-357, ]$OS_STATUS)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",87/(87+211)," deceased"))
+  print(paste("Cluster 2: ",54/(54+80)," dead with tumour"))
+
+
+  # Confusion matrx for person neoplasm cancer status
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data[-357, ]$PERSON_NEOPLASM_CANCER_STATUS)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",77/(77+207)," with tumour"))
+  print(paste("Cluster 2: ",38/(38+93)," with tumour"))
+  
+  # Confusion matrx for sex
+  confusion_matrix <- table(km_pc$cluster, subset_clinical_data[-357, ]$SEX)
+  print(confusion_matrix)
+  print(paste("Cluster 1: ",187/(187+111)," male"))
+  print(paste("Cluster 1: ",81/(81+53)," male"))
+
+```
+### Essentially no difference after removing outlier
