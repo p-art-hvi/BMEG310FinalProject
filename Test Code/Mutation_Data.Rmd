@@ -1,0 +1,109 @@
+---
+title: "Mutation Data"
+author: "Amarpreet Powar"
+date: "10/11/2020"
+output: html_document
+---
+
+```{r data}
+
+# Extract Data
+mutation_data = read.delim("data_mutations_extended.txt")
+head(mutation_data)
+variant_types <- unique(mutation_data$Variant_Classification)    # Extracting the different categories from variant_classification
+patient_IDs <- unique(mutation_data$Tumor_Sample_Barcode)     # Extracting patient IDs from mutation data
+
+
+library("readxl")
+library("klaR")
+library("stringr")
+
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")    # Extracting patient IDs from clinical data
+edited_patient_IDs <- str_sub(patient_IDs, end=-4)      # Editing the patient IDs from mutation data to match format of clinical data
+
+ind <- vector()
+for (i in 1:nrow(patient_dataset)) {
+  ind[i] = patient_dataset$PATIENT_ID[i]%in%edited_patient_IDs # Seeing which patients have entries in both clinical and mutation data
+}
+subset_patient_data <- patient_dataset[ind, ] # This is the patient data with only the relevant patients (ie these patients also have mutation data)
+```
+
+
+```{r create dataframe}
+# Create dataframe to store the number of mutation variants each patient has
+patient_variants <- data.frame(matrix(ncol = length(variant_types), nrow = length(patient_IDs)))  # Setting up matrix
+# Naming the rows and columns
+colnames(patient_variants) <- variant_types
+rownames(patient_variants) <- patient_IDs
+# Initialize all values to zero
+patient_variants[is.na(patient_variants)] <- 0
+# Loop through the patients. Add 1 to the relevant matrix entry if they have the given mutation
+for (i in 1:length(mutation_data$Tumor_Sample_Barcode)) {
+  patient_variants[mutation_data$Tumor_Sample_Barcode[i], mutation_data$Variant_Classification[i]] = 1 + patient_variants[mutation_data$Tumor_Sample_Barcode[i], mutation_data$Variant_Classification[i]]
+}
+```
+
+```{r hierarchical clustering}
+# Try hierarchical clustering
+
+# Build distance matrix
+dist_mat <- dist(patient_variants, method = 'euclidean')
+hclust_avg <- hclust(dist_mat, method = 'average')
+cut_avg <- cutree(hclust_avg, k=2)
+plot(hclust_avg, main = "Average Method")
+```
+```{r number_observations}
+# Number of observations assigned to each cluster  
+suppressPackageStartupMessages(library(dplyr))
+pat_clusters <- mutate(patient_variants, cluster = cut_avg)
+count(pat_clusters, cluster)
+
+# Cross check clustering results
+# Comparing to disease specific survival
+table(pat_clusters$cluster, subset_patient_data$DSS_STATUS)
+
+# Conclusion - clustering based on number of mutations does not work well
+
+```
+
+```{r Impact}
+# See how many low/moderate/high/modifer mutations the patients have
+impact_types <- unique(mutation_data$IMPACT)
+patient_IDs <- unique(mutation_data$Tumor_Sample_Barcode)
+
+# Create dataframe to store the number of mutation variants each patient has
+patient_impacts <- data.frame(matrix(ncol = length(impact_types), nrow = length(patient_IDs)))
+colnames(patient_impacts) <- impact_types
+rownames(patient_impacts) <- patient_IDs
+
+# Initialize all values to zero
+patient_impacts[is.na(patient_impacts)] <- 0
+
+for (i in 1:length(mutation_data$Tumor_Sample_Barcode)) {
+  patient_impacts[mutation_data$Tumor_Sample_Barcode[i], mutation_data$IMPACT[i]] = 1 + patient_impacts[mutation_data$Tumor_Sample_Barcode[i], mutation_data$IMPACT[i]]
+}
+
+# Try hierarchical clustering
+
+# Build distance matrix
+dist_mat_impact <- dist(patient_impacts, method = 'euclidean')
+hclust_impact <- hclust(dist_mat_impact, method = 'average')
+cut_impact <- cutree(hclust_impact, k=2)
+plot(hclust_impact, main = "Average Method")
+
+# Number of observations assigned to each cluster  
+suppressPackageStartupMessages(library(dplyr))
+pat_impact_clusters <- mutate(patient_impacts, cluster = cut_impact)
+count(pat_impact_clusters, cluster)
+
+# Cross check clustering results
+# Comparing to disease specific survival
+table(pat_impact_clusters$cluster, subset_patient_data$DSS_STATUS)
+
+# Conclusion - clustering based on number of "impact" mutations does not work well
+
+
+
+```
+
+```
