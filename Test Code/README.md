@@ -10,7 +10,7 @@
 
 [HTML File](https://github.com/p-art-hvi/BMEG310FinalProject/blob/main/Test%20Code/RNAseq_v1.html)
 
-## Mutation Data COde
+## Mutation Data Code
 
 [RMD File](https://github.com/p-art-hvi/BMEG310FinalProject/blob/main/Test%20Code/Mutation_Data.Rmd)
 
