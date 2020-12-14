@@ -1,0 +1,103 @@
+---
+title: "Survival Analysis on Clinical Data"
+author: "Amarpreet Powar"
+date: "23/11/2020"
+output: html_document
+---
+
+# Survival Analysis on Patient Features  
+
+```{r setup}
+
+# Loading libraries and data
+library("readxl")
+
+patient_dataset <- read_excel("reduced_data_clinical_patient.xlsx")
+
+# load libraries
+suppressMessages(library("TCGAbiolinks"))
+suppressMessages(library("survival"))
+suppressMessages(library("survminer"))
+suppressMessages(library("SummarizedExperiment"))
+
+patient_dataset$OS_STATUS = patient_dataset$OS_STATUS == "1:DECEASED"
+
+# Let's sort the ages of our patients into groups so that comparisons are easier later on
+for (i in 1:nrow(patient_dataset)) {
+  age = patient_dataset$AGE[i]
+  if (age < 60) {
+    patient_dataset$AGEGROUP[i] = 1
+  }
+  else {
+    patient_dataset$AGEGROUP[i] = 2
+  }
+}
+
+```
+
+```{r sex}
+
+# Considering sex of patient
+fit = survfit(Surv(OS_MONTHS, OS_STATUS) ~ SEX, data=patient_dataset)
+
+print(fit)
+
+# produce a Kaplan Meier plot and risk table
+ggsurvplot(fit, data=patient_dataset, pval=T, risk.table=T)
+
+```
+```{r age}
+
+# Considering age group of patient
+fit = survfit(Surv(OS_MONTHS, OS_STATUS) ~ AGEGROUP, data=patient_dataset)
+
+print(fit)
+
+# produce a Kaplan Meier plot and risk table
+ggsurvplot(fit, data=patient_dataset, pval=T, risk.table=T)
+
+```
+
+#### There does not seem to be a correlation between the sex of the patient and their survival.  
+
+
+```{r tumor stage}
+
+# Considering stage of cancer of the patient
+fit = survfit(Surv(OS_MONTHS, OS_STATUS) ~ AJCC_PATHOLOGIC_TUMOR_STAGE, data=patient_dataset)
+
+print(fit)
+
+# produce a Kaplan Meier plot and risk table
+ggsurvplot(fit, data=patient_dataset, pval=T, risk.table=T)
+
+
+```
+
+```{r tumor type}
+
+# Looking at tumour type of patients
+fit = survfit(Surv(OS_MONTHS, OS_STATUS) ~ PATH_T_STAGE, data=patient_dataset)
+
+print(fit)
+
+# produce a Kaplan Meier plot and risk table
+ggsurvplot(fit, data=patient_dataset, pval=T, risk.table=T)
+
+
+```
+
+```{r neoplasm status}
+
+# Looking at PERSON_NEOPLASM_CANCER_STATUS
+fit = survfit(Surv(OS_MONTHS, OS_STATUS) ~ PERSON_NEOPLASM_CANCER_STATUS, data=patient_dataset)
+
+print(fit)
+
+# produce a Kaplan Meier plot and risk table
+ggsurvplot(fit, data=patient_dataset, pval=T, risk.table=T)
+
+
+```
+
+
